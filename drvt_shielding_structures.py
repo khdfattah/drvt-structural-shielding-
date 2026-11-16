@@ -256,4 +256,231 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # --- TAB 1: Multi-Layer Composite Barrier Calculator ---
 with tab1:
     st.subheader("Smart Multi-Layer Composite Shielding Calculator")
-    st.markdown(
+    st.markdown("Design layered structural barriers combining high-Z nanoscale cavity contraction (e.g., Barite/Steel-Shot) "
+        "with structural concrete backing based on **DRVT Volumetric Attenuation Law**."
+    )
+    
+    if input_mode == "Benchmark Energy Regimes":
+        available_mats = list(reg_obj["materials"].keys())
+        num_layers = st.slider("Number of Structural Barrier Layers:", min_value=2, max_value=4, value=3)
+        
+        layer_configs = []
+        cols_layers = st.columns(num_layers)
+        
+        default_indices = list((4, 2, 1, 3))
+        default_thicknesses = list((25.0, 40.0, 100.0, 30.0))
+        
+        for i in range(num_layers):
+            with cols_layers[i]:
+                st.markdown(f"**Layer {i+1} (Incident → Exit)**")
+                idx_choice = default_indices[i] if default_indices[i] < len(available_mats) else 1
+                l_mat = st.selectbox(
+                    f"Material (L{i+1}):",
+                    available_mats,
+                    index=idx_choice,
+                    key=f"mat_l_{i}"
+                )
+                l_thick_mm = st.number_input(
+                    f"Thickness (mm) (L{i+1}):",
+                    min_value=1.0,
+                    max_value=5000.0,
+                    value=default_thicknesses[i],
+                    step=5.0,
+                    key=f"thick_l_{i}"
+                )
+                
+                m_props = reg_obj["materials"][l_mat]
+                l_metrics = compute_shielding_metrics(m_props["rho"], m_props["Mm"], Mo, lambda_nm)
+                layer_configs.append({
+                    "Layer": f"Layer {i+1}: {l_mat}",
+                    "Material": l_mat,
+                    "Thickness_mm": l_thick_mm,
+                    "Density": m_props["rho"],
+                    "V_eff": l_metrics["V_eff"],
+                    "V_ratio": l_metrics["vol_ratio_pct"],
+                    "mu": l_metrics["mu"],
+                    "mu_x": l_metrics["mu"] * (l_thick_mm / 10.0)
+                })
+        
+        # Cumulative DRVT Attenuation Calculations
+        total_thickness_mm = sum(item["Thickness_mm"] for item in layer_configs)
+        total_mu_x = sum(item["mu_x"] for item in layer_configs)
+        transmission_fraction = np.exp(-total_mu_x)
+        total_attenuation_pct = (1.0 - transmission_fraction) * 100.0
+        total_hvl_equivalents = total_mu_x / np.log(2)
+        
+        # Equivalent Normal Concrete Thickness for Footprint Comparison
+        norm_props = reg_obj["materials"]["Normal Concrete"]
+        norm_metrics = compute_shielding_metrics(norm_props["rho"], norm_props["Mm"], Mo, lambda_nm)
+        equiv_normal_mm = (total_mu_x / norm_metrics["mu"]) * 10.0
+        space_saved_mm = equiv_normal_mm - total_thickness_mm
+        space_saved_pct = (space_saved_mm / equiv_normal_mm) * 100.0 if equiv_normal_mm > 0 else 0.0
+        
+        st.markdown("---")
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        with m_col1:
+            st.metric(
+                label="Composite Thickness",
+                value=f"{total_thickness_mm:.1f} mm",
+                delta=f"{total_thickness_mm/10.0:.2f} cm total wall",
+                delta_color="off"
+            )
+        with m_col2:
+            st.metric(
+                label="Shielding Efficiency",
+                value=f"{total_attenuation_pct:.4f}%",
+                delta=f"{total_hvl_equivalents:.2f} HVLs blocked",
+                delta_color="normal"
+            )
+        with m_col3:
+            st.metric(
+                label="Normal Concrete Eq.",
+                value=f"{equiv_normal_mm:.1f} mm",
+                delta=f"{equiv_normal_mm/10.0:.2f} cm standard wall",
+                delta_color="off"
+            )
+        with m_col4:
+            st.metric(
+                label="Footprint Saved",
+                value=f"{space_saved_mm:.1f} mm",
+                delta=f"{space_saved_pct:.1f}% wall reduction",
+                delta_color="normal" if space_saved_mm >= 0 else "inverse"
+            )
+            
+        # Generate Step-by-Step Beam Intensity Profile across Layers
+        depth_points = [0.0]
+        intensity_points = [100.0]
+        layer_labels = ["Incident Beam (0 mm)"]
+        
+        cum_depth = 0.0
+        cum_mux = 0.0
+        for item in layer_configs:
+            sub_steps = np.linspace(0, item["Thickness_mm"], 25)[1:]
+            for s in sub_steps:
+                d_val = cum_depth + s
+                mux_val = cum_mux + item["mu"] * (s / 10.0)
+                depth_points.append(d_val)
+                intensity_points.append(100.0 * np.exp(-mux_val))
+                layer_labels.append(item["Layer"])
+            cum_depth += item["Thickness_mm"]
+            cum_mux += item["mu_x"]
+            
+        df_profile = pd.DataFrame({
+            "Wall Depth (mm)": depth_points,
+            "Relative Beam Intensity I/I0 (%)": intensity_points,
+            "Active Barrier Layer": layer_labels
+        })
+        
+        fig_comp_wall = px.line(
+            df_profile,
+            x="Wall Depth (mm)",
+            y="Relative Beam Intensity I/I0 (%)",
+            color="Active Barrier Layer",
+            title=f"Radiation Intensity Decay Across Composite Barrier ({selected_regime})"
+        )
+        fig_comp_wall.update_traces(line=dict(width=3))
+        st.plotly_chart(fig_comp_wall, use_container_width=True)
+        
+        # Layer Breakdown Summary Table
+        df_layers_summary = pd.DataFrame(layer_configs)[
+            ["Layer", "Thickness_mm", "Density", "V_eff", "V_ratio", "mu", "mu_x"]
+        ].rename(columns={
+            "Thickness_mm": "Thickness (mm)",
+            "Density": "ρ (g/cm³)",
+            "V_eff": "V_eff (nm³)",
+            "V_ratio": "V_eff/V_res (%)",
+            "mu": "μ (cm⁻¹)",
+            "mu_x": "Optical Depth (μ·x)"
+        })
+        st.dataframe(df_layers_summary, use_container_width=True)
+    else:
+        st.info("Switch to 'Benchmark Energy Regimes' in the sidebar to configure multi-layer composite concrete barriers.")
+
+# --- TAB 2: Multi-Material Cavity Analysis ---
+with tab2:
+    if input_mode == "Benchmark Energy Regimes":
+        rows = []
+        for mat_name, props in reg_obj["materials"].items():
+            m_res = compute_shielding_metrics(props["rho"], props["Mm"], Mo, lambda_nm, target_attenuation)
+            rows.append({
+                "Shielding Medium": mat_name,
+                "Density ρ (g/cm³)": props["rho"],
+                "Z_eff": props["Z_eff"],
+                "V_eff (nm³)": round(m_res["V_eff"], 2),
+                "V_eff / V_res (%)": round(m_res["vol_ratio_pct"], 2),
+                "r_eff (nm)": round(m_res["r_eff"], 2),
+                "μ (cm⁻¹)": round(m_res["mu"], 4),
+                "HVL (mm)": round(m_res["hvl_mm"], 2),
+                f"Thickness {target_attenuation:.0f}% (mm)": round(m_res["req_thickness_mm"], 2)
+            })
+        df_results = pd.DataFrame(rows)
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            fig_cavity = px.bar(
+                df_results,
+                x="Shielding Medium",
+                y="V_eff / V_res (%)",
+                color="Shielding Medium",
+                text="V_eff / V_res (%)",
+                title=f"Nanoscale Cavity Deformation vs. V_res ({selected_regime})"
+            )
+            fig_cavity.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="V_res = 286.398 nm³ (100%)")
+            st.plotly_chart(fig_cavity, use_container_width=True)
+            
+        with c2:
+            fig_hvl = px.bar(
+                df_results,
+                x="Shielding Medium",
+                y="HVL (mm)",
+                color="Shielding Medium",
+                text="HVL (mm)",
+                title=f"Required Structural Half-Value Layer ({selected_regime})"
+            )
+            st.plotly_chart(fig_hvl, use_container_width=True)
+            
+        st.subheader("Breathing Geometric Space Across Energy Extremes")
+        breath_rows = []
+        for r_key, r_val in REGIMES_DATA.items():
+            for m_key, m_val in r_val["materials"].items():
+                if m_key != "Water Baseline":
+                    b_m = compute_shielding_metrics(m_val["rho"], m_val["Mm"], r_val["Mo"], r_val["lambda_nm"])
+                    breath_rows.append({
+                        "Operational Regime": r_key,
+                        "Shielding Medium": m_key,
+                        "V_eff / V_res (%)": b_m["vol_ratio_pct"],
+                        "HVL (mm)": b_m["hvl_mm"]
+                    })
+        df_breath = pd.DataFrame(breath_rows)
+        fig_breath = px.line(
+            df_breath,
+            x="Operational Regime",
+            y="V_eff / V_res (%)",
+            color="Shielding Medium",
+            markers=True,
+            title="Volumetric Contraction & Dilation Trajectory (100 keV → 1.25 MeV → 5.00 MeV)"
+        )
+        fig_breath.add_hline(y=100, line_dash="dot", line_color="black", annotation_text="Water Reference Baseline (100%)")
+        st.plotly_chart(fig_breath, use_container_width=True)
+    else:
+        st.info("Switch to 'Benchmark Energy Regimes' in the sidebar to view comparative charts across standard and heavy concretes.")
+
+# --- TAB 3: Nanoscale Geometry Cross-Section ---
+with tab3:
+    st.subheader(f"Isotropic Interaction Cavity Cross-Section: {selected_material}")
+    g_col1, g_col2 = st.columns([1.3, 1])
+    
+    with g_col1:
+        theta = np.linspace(0, 2 * np.pi, 250)
+        fig_circle = go.Figure()
+        
+        fig_circle.add_trace(go.Scatter(
+            x=metrics["r_res_ref"] * np.cos(theta),
+            y=metrics["r_res_ref"] * np.sin(theta),
+            mode="lines",
+            name=f"Water Reference Radius (r_res = {metrics['r_res_ref']:.2f} nm)",
+            line=dict(color="#1E3A8A", dash="dash", width=2)
+        ))
+        
+        is_contracted = metrics["vol_ratio_pct"] < 100
+
