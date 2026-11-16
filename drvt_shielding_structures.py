@@ -202,16 +202,16 @@ st.info(
 )
 
 # ---------------------------------------------------------
-# 6. Primary Engineering & Structural Metrics
+# 6. Primary Engineering & Structural Metrics (Optimized Labels)
 # ---------------------------------------------------------
 st.markdown('<div class="section-heading">Primary Engineering & Structural Metrics</div>', unsafe_allow_html=True)
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    delta_label = "Spatial Contraction" if metrics["vol_ratio_pct"] < 100 else "Spatial Dilation"
+    delta_label = "Contraction" if metrics["vol_ratio_pct"] < 100 else "Dilation"
     st.metric(
-        label="Effective Cavity Volume (V_eff)",
+        label="Cavity Volume (V_eff)",
         value=f"{metrics['V_eff']:.2f} nm³",
         delta=f"{metrics['vol_ratio_pct']:.1f}% ({delta_label})",
         delta_color="inverse" if metrics["vol_ratio_pct"] < 100 else "normal"
@@ -227,7 +227,7 @@ with col2:
 
 with col3:
     st.metric(
-        label="Linear Attenuation (μ)",
+        label="Attenuation (μ)",
         value=f"{metrics['mu']:.4f} cm⁻¹",
         delta=f"r_eff: {metrics['r_eff']:.2f} nm",
         delta_color="off"
@@ -235,7 +235,7 @@ with col3:
 
 with col4:
     st.metric(
-        label=f"Design Wall Thickness ({target_attenuation:.0f}%)",
+        label=f"Wall Thickness ({target_attenuation:.0f}%)",
         value=f"{metrics['req_thickness_mm']:.1f} mm",
         delta=f"{metrics['req_thickness_mm']/10.0:.2f} cm barrier",
         delta_color="off"
@@ -256,3 +256,4 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # --- TAB 1: Multi-Layer Composite Barrier Calculator ---
 with tab1:
     st.subheader("Smart Multi-Layer Composite Shielding Calculator")
+    st.markdown(
