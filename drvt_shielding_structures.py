@@ -38,6 +38,9 @@ st.markdown("""
         margin-top: 1.5rem;
         margin-bottom: 1rem;
     }
+    [data-testid="stMetricValue"] {
+        font-size: 1.55rem !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -202,7 +205,7 @@ st.info(
 )
 
 # ---------------------------------------------------------
-# 6. Primary Engineering & Structural Metrics (Optimized Labels)
+# 6. Primary Engineering & Structural Metrics
 # ---------------------------------------------------------
 st.markdown('<div class="section-heading">Primary Engineering & Structural Metrics</div>', unsafe_allow_html=True)
 
@@ -244,19 +247,19 @@ with col4:
 st.divider()
 
 # ---------------------------------------------------------
-# 7. Analytical Visualizations, Composite Wall & BIM Matrix
+# 7. Analytical Visualizations, Composite Wall, BIM & Theory
 # ---------------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🧱 Multi-Layer Composite Wall",
     "📊 Multi-Material Cavity Analysis",
     "🌐 Nanoscale Geometry Cross-Section",
-    "📑 BIM & Structural Export Matrix"
-])
-
+    "📑 BIM & Structural Export Matrix",
+    
 # --- TAB 1: Multi-Layer Composite Barrier Calculator ---
 with tab1:
     st.subheader("Smart Multi-Layer Composite Shielding Calculator")
-    st.markdown("Design layered structural barriers combining high-Z nanoscale cavity contraction (e.g., Barite/Steel-Shot) "
+    st.markdown(
+        "Design layered structural barriers combining high-Z nanoscale cavity contraction (e.g., Barite/Steel-Shot) "
         "with structural concrete backing based on **DRVT Volumetric Attenuation Law**."
     )
     
@@ -479,8 +482,3 @@ with tab3:
             y=metrics["r_res_ref"] * np.sin(theta),
             mode="lines",
             name=f"Water Reference Radius (r_res = {metrics['r_res_ref']:.2f} nm)",
-            line=dict(color="#1E3A8A", dash="dash", width=2)
-        ))
-        
-        is_contracted = metrics["vol_ratio_pct"] < 100
-
