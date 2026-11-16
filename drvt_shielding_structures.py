@@ -247,6 +247,7 @@ with col4:
 st.divider()
 
 # ---------------------------------------------------------
+# ---------------------------------------------------------
 # 7. Analytical Visualizations, Composite Wall, BIM & Theory
 # ---------------------------------------------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -254,7 +255,9 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Multi-Material Cavity Analysis",
     "🌐 Nanoscale Geometry Cross-Section",
     "📑 BIM & Structural Export Matrix",
-    
+    "📖 DRVT Mathematical Formulation"
+])
+
 # --- TAB 1: Multi-Layer Composite Barrier Calculator ---
 with tab1:
     st.subheader("Smart Multi-Layer Composite Shielding Calculator")
@@ -262,6 +265,7 @@ with tab1:
         "Design layered structural barriers combining high-Z nanoscale cavity contraction (e.g., Barite/Steel-Shot) "
         "with structural concrete backing based on **DRVT Volumetric Attenuation Law**."
     )
+
     
     if input_mode == "Benchmark Energy Regimes":
         available_mats = list(reg_obj["materials"].keys())
