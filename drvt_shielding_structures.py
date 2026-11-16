@@ -481,8 +481,126 @@ with tab3:
         theta = np.linspace(0, 2 * np.pi, 250)
         fig_circle = go.Figure()
         
-        fig_circle.add_trace(go.Scatter(
+        trace_water = go.Scatter(
             x=metrics["r_res_ref"] * np.cos(theta),
             y=metrics["r_res_ref"] * np.sin(theta),
             mode="lines",
             name=f"Water Reference Radius (r_res = {metrics['r_res_ref']:.2f} nm)",
+            line=dict(color="#1E3A8A", dash="dash", width=2)
+        )
+        fig_circle.add_trace(trace_water)
+        
+        is_contracted = metrics["vol_ratio_pct"] < 100
+        fill_rgba = "rgba(220, 38, 38, 0.22)" if is_contracted else "rgba(16, 185, 129, 0.22)"
+        stroke_hex = "#DC2626" if is_contracted else "#059669"
+        
+        trace_mat = go.Scatter(
+            x=metrics["r_eff"] * np.cos(theta),
+            y=metrics["r_eff"] * np.sin(theta),
+            mode="lines",
+            fill="toself",
+            fillcolor=fill_rgba,
+            name=f"{selected_material} (r_eff = {metrics['r_eff']:.2f} nm)",
+            line=dict(color=stroke_hex, width=3)
+        )
+        fig_circle.add_trace(trace_mat)
+        
+        fig_circle.update_layout(
+            title="Transverse Resonant State Cross-Section (A_eff = π · r_eff²)",
+            xaxis_title="Transverse Coordinate X (nm)",
+            yaxis_title="Transverse Coordinate Y (nm)",
+            yaxis=dict(scaleanchor="x", scaleratio=1),
+            height=480
+        )
+        st.plotly_chart(fig_circle, use_container_width=True)
+        
+    with g_col2:
+        st.markdown("#### Quantum-Geometric Diagnostics")
+        st.write(f"""
+        * **Theoretical Framework:** Dynamic Resonant Volume Theory (DRVT) — Dr. Khalid Abdel Fattah
+        * **Incident Wavelength ($\\lambda$):** `{lambda_nm:.6f} nm`
+        * **Reference Resonant Area ($A_{{ref}}$):** `{V_RES / lambda_nm:.2f} nm²`
+        * **Effective Cavity Volume ($V_{{eff}}$):** `{metrics['V_eff']:.2f} nm³`
+        * **Geometric State:** `{metrics['cavity_status']}`
+        """)
+        if is_contracted:
+            st.success(
+                "**Spatial Collapse Active:** High-Z atomic shells or nuclear fields compress the interaction cavity below "
+                "the 286.398 nm³ baseline, driving non-linear attenuation and reducing wall thickness."
+            )
+        else:
+            st.warning(
+                "**Spatial Dilation Active:** Compton scattering expands the interaction cavity beyond the water baseline, "
+                "requiring bulk mass compaction (ρ) to maintain structural attenuation."
+            )
+
+# --- TAB 4: BIM & Structural Export Matrix ---
+with tab4:
+    st.subheader("Structural Shielding Data Matrix (BIM Integration Ready)")
+    if input_mode == "Benchmark Energy Regimes":
+        st.dataframe(df_results, use_container_width=True)
+        csv_bytes = df_results.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download Single-Material BIM Dataset (CSV)",
+            data=csv_bytes,
+            file_name=f"DRVT_Structural_Shielding_{selected_regime[:10].replace(' ', '_')}.csv",
+            mime="text/csv"
+        )
+        
+        st.markdown("---")
+        st.subheader("Composite Barrier Design Export (CSV)")
+        comp_csv = df_layers_summary.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download Multi-Layer Composite Wall Schedule (CSV)",
+            data=comp_csv,
+            file_name=f"DRVT_Composite_Barrier_{selected_regime[:10].replace(' ', '_')}.csv",
+            mime="text/csv"
+        )
+    else:
+        custom_table = pd.DataFrame([{
+            "Shielding Medium": selected_material,
+            "Energy (keV)": energy_kev,
+            "Wavelength (nm)": lambda_nm,
+            "Density (g/cm³)": rho,
+            "V_eff (nm³)": round(metrics["V_eff"], 2),
+            "V_eff / V_res (%)": round(metrics["vol_ratio_pct"], 2),
+            "r_eff (nm)": round(metrics["r_eff"], 2),
+            "μ (cm⁻¹)": round(metrics["mu"], 4),
+            "HVL (mm)": round(metrics["hvl_mm"], 2),
+            "TVL (mm)": round(metrics["tvl_mm"], 2),
+            f"Thickness {target_attenuation:.0f}% (mm)": round(metrics["req_thickness_mm"], 2)
+        }])
+        st.dataframe(custom_table, use_container_width=True)
+
+# --- TAB 5: DRVT Mathematical Formulation & Theoretical Reference ---
+with tab5:
+    st.subheader("Dynamic Resonant Volume Theory (DRVT) — Mathematical & Physical Framework")
+    st.markdown("**Author:** Dr. Khalid Abdel Fattah (*Merowe Institute of Technology, Merowe University of Technology, Sudan*)")
+    
+    col_eq1, col_eq2 = st.columns(2)
+    
+    with col_eq1:
+        st.markdown("#### 1. Fundamental Quantum-Geometric Invariants")
+        st.latex(r"V_{\text{res}} = \frac{2 \lambda_c \cdot \pi r_1^2}{\alpha^2} = 286.398 \text{ nm}^3 \quad (r_1 = 1 \text{ nm})")
+        st.latex(r"\lambda_R = \frac{2 \lambda_c}{\alpha^2} = 91.127 \text{ nm}, \quad \lambda_c = \frac{h}{m_e c} = 0.00242631 \text{ nm}")
+        st.latex(r"\frac{E}{r_{\text{res}}^2} = \pi k = 13.606 \text{ eV/nm}^2 \quad \left(k = \frac{13}{3} \text{ eV/nm}^2\right)")
+        
+    with col_eq2:
+        st.markdown("#### 2. Structural Shielding & Cavity Mapping")
+        st.latex(r"V_{\text{eff}} = V_{\text{res}} \cdot \left(\frac{M_o}{M_m}\right), \quad r_{\text{eff}} = \sqrt{\frac{V_{\text{eff}}}{\pi \cdot \lambda}}")
+        st.latex(r"\mu = \rho \cdot M_o \cdot \left(\frac{V_{\text{res}}}{V_{\text{eff}}}\right)")
+        st.latex(r"\text{HVL [mm]} = \frac{\ln(2)}{\mu} \times 10 = \frac{10 \ln(2)}{\rho \cdot M_o \cdot (V_{\text{res}} / V_{\text{eff}})}")
+        
+    st.markdown("---")
+    st.markdown("#### 3. Spectral Resonance Classification Domains")
+    regime_table = pd.DataFrame([
+        {"Resonance Regime": "Pre-Resonant Domain", "Wavelength Condition": "λ < λ_c (0.002426 nm)", "Resonant Radius": "r_res > 193.8 nm", "Physical Regime": "Vacuum & Nuclear Pair-Production (> 511 keV)"},
+        {"Resonance Regime": "Above-Reference Resonance", "Wavelength Condition": "λ_c < λ < λ_R", "Resonant Radius": "1 nm < r_res < 193.8 nm", "Physical Regime": "Transverse Expansion / Diagnostic & Hard X-Ray"},
+        {"Resonance Regime": "Reference Resonance", "Wavelength Condition": "λ = λ_R (91.127 nm)", "Resonant Radius": "r_res = 1.00 nm", "Physical Regime": "Fundamental Geometric Equilibrium (13.606 eV)"},
+        {"Resonance Regime": "Below-Reference Resonance", "Wavelength Condition": "λ_R < λ < λ_B", "Resonant Radius": "0.053 nm < r_res < 1 nm", "Physical Regime": "Progressive Atomic-Scale Localization"},
+        {"Resonance Regime": "Post-Atomic Resonance Domain", "Wavelength Condition": "λ > λ_B (32.55 μm)", "Resonant Radius": "r_res << 0.053 nm (a_0)", "Physical Regime": "Collective Lattice & Phonon Vibrations (< 38 meV)"}
+    ])
+    st.dataframe(regime_table, use_container_width=True)
+
+st.markdown("---")
+st.caption("© DRVT Quantum-Geometric Structural Shielding Suite | Formulated on Dynamic Resonant Volume Theory (DRVT) by Dr. Khalid Abdel Fattah.")
