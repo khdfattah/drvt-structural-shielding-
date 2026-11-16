@@ -255,4 +255,4 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # --- TAB 1: Multi-Layer Composite Barrier Calculator ---
 with tab1:
-
+    st.subheader("Smart Multi-Layer Composite Shielding Calculator")
